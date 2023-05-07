@@ -34,19 +34,20 @@ class DownloadAlreadyExists(Exception):
 
 class Download(NamedTuple):
     url: StrOrURL
-    name: str
+    path: Path
     length: int | None
     start: int
 
     @classmethod
-    async def new(cls, session: ClientSession, url: StrOrURL) -> Self:
+    async def new(cls, session: ClientSession, url: StrOrURL, /) -> Self:
         async with session.head(url) as resp:
             name = parse_name(resp, "untitled")
             length = parse_length(resp.headers)
-            start = await get_start_byte(resp.headers, _DIR.get() / name)
+            path = _DIR.get() / name
+            start = await get_start_byte(resp.headers, path)
             if start == length:
                 raise DownloadAlreadyExists(name)
-            return cls(url, name, length, start)
+            return cls(url, path, length, start)
 
 
 class DownloadHandler(RequestHandler[Download, None]):
@@ -57,8 +58,7 @@ class DownloadHandler(RequestHandler[Download, None]):
 
     async def process_response(self, resp: ClientResponse) -> None:
         dl = self.ctx.get()
-        file = _DIR.get() / dl.name
-        async with resp, aiofiles.open(file, "wb") as f:
+        async with resp, aiofiles.open(dl.path, "wb") as f:
             with tqdm.tqdm(
                 total=dl.length,
                 initial=dl.start,
