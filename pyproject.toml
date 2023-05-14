@@ -1,3 +1,13 @@
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 79
+
+[tool.isort]
+profile = "black"
+line_length = 79
+lines_after_imports = 2
+multi_line_output = 3
+skip_gitignore = true
