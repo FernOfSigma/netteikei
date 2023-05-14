@@ -9,7 +9,7 @@ import tqdm
 
 from .. import Client, Handler
 from ..typedefs import Request, SessionOpts, StrOrURL
-from .utils import parse_name, parse_length, get_start_byte
+from .utils import isfile, parse_name, parse_length, get_start_byte
 
 
 _DIR: ContextVar[Path] = ContextVar("dir")
@@ -17,11 +17,11 @@ _DIR: ContextVar[Path] = ContextVar("dir")
 
 class DownloadAlreadyExists(Exception):
     
-    def __init__(self, name: str) -> None:
-        self.name = name
+    def __init__(self, path: Path) -> None:
+        self.path = path
 
     def __str__(self) -> str:
-        return f"'{self.name}' alredy exists"
+        return f"'{self.path}' alredy exists"
 
 
 class Download(NamedTuple):
@@ -37,8 +37,8 @@ class Download(NamedTuple):
             length = parse_length(resp.headers)
             path = _DIR.get() / name
             start = await get_start_byte(resp.headers, path)
-            if start == length:
-                raise DownloadAlreadyExists(name)
+            if await isfile(path) and start == length:
+                raise DownloadAlreadyExists(path)
             return cls(url, path, length, start)
 
 
