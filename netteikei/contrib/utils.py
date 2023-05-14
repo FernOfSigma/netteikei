@@ -10,17 +10,21 @@ import pyrfc6266
 
 from ..typedefs import Headers
 
-P = ParamSpec("P")
-T = TypeVar("T")
 
-def _wrap(fn: Callable[P, T]) -> Callable[P, Awaitable[T]]:
+_P = ParamSpec("_P")
+_R = TypeVar("_R")
+
+
+def wrap(fn: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
     @functools.wraps(fn)
-    async def inner(*args: P.args, **kwargs: P.kwargs) -> T:
+    async def inner(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         return await asyncio.to_thread(fn, *args, **kwargs)
     return inner
 
-getsize = _wrap(os.path.getsize)
-isfile = _wrap(os.path.isfile)
+
+getsize = wrap(os.path.getsize)
+isfile = wrap(os.path.isfile)
+
 
 def parse_name(resp: ClientResponse, default: str) -> str:
     if (s := resp.headers.get("Content-Disposition")) is None:
@@ -30,9 +34,11 @@ def parse_name(resp: ClientResponse, default: str) -> str:
             return default
         return name
 
+
 def parse_length(headers: Headers) -> int | None:
     if (s := headers.get("Content-Length")) is not None:
         return int(s)
+
 
 async def get_start_byte(headers: Headers, file: Path) -> int:
     if headers.get("Accept-Ranges") == "bytes" and await isfile(file):
