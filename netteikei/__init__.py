@@ -1,3 +1,5 @@
-__version__ = "0.1.1"
+from .core import Client, Handler
 
-from .core import Client, RequestHandler
+
+__version__ = "0.1.1"
+__all__ = ["Client", "Handler"]

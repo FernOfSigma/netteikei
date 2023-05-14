@@ -7,17 +7,9 @@ import aiofiles
 from aiohttp import ClientResponse, ClientSession
 import tqdm
 
-from .. import Client, RequestHandler
-from ..typedefs import (
-    RequestParams,
-    SessionOpts,
-    StrOrURL
-)
-from .utils import (
-    parse_name,
-    parse_length,
-    get_start_byte
-)
+from .. import Client, Handler
+from ..typedefs import Request, SessionOpts, StrOrURL
+from .utils import parse_name, parse_length, get_start_byte
 
 
 _DIR: ContextVar[Path] = ContextVar("dir")
@@ -50,11 +42,14 @@ class Download(NamedTuple):
             return cls(url, path, length, start)
 
 
-class DownloadHandler(RequestHandler[Download, None]):
+class Downloader(Handler[Download, None]):
 
-    async def generate_params(self) -> RequestParams:
+    async def create_request(self) -> Request:
         dl = self.ctx.get()
-        return "GET", dl.url, {"headers": {"Range": f"bytes={dl.start}-"}}
+        return Request.new(
+            url=dl.url,
+            headers={"Range": f"bytes={dl.start}-"}
+        )
 
     async def process_response(self, resp: ClientResponse) -> None:
         dl = self.ctx.get()
@@ -77,17 +72,14 @@ async def download(
     dir: Path,
     /,
     *urls: StrOrURL,
-    concurrent_limit: int = 3,
+    limit: int = 3,
     **kwargs: Unpack[SessionOpts]
 ) -> None:
-    _DIR.set(dir)
+    token = _DIR.set(dir)
     async with ClientSession(**kwargs) as session:
         dls = await asyncio.gather(
             *(Download.new(session, url) for url in urls)
         )
-        client = Client(
-            session=session,
-            handler=DownloadHandler(),
-            max_workers=concurrent_limit
-        )
+        client = Client(session, Downloader(), max_workers=limit)
         await client.gather(*dls)
+    _DIR.reset(token)

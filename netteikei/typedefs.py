@@ -1,9 +1,5 @@
-from collections.abc import (
-    Callable,
-    Iterable,
-    Mapping
-)
-from typing import Any, Literal, TypedDict
+from collections.abc import Callable, Iterable, Mapping
+from typing import Any, Literal, NamedTuple, Self, TypedDict, Unpack
 
 from aiohttp import (
     BaseConnector,
@@ -41,4 +37,17 @@ class SessionOpts(TypedDict, total=False):
     trace_configs: list[TraceConfig] | None
 
 
-RequestParams = tuple[Method, StrOrURL, SessionOpts]
+class Request(NamedTuple):
+    method: Method
+    url: StrOrURL
+    opts: SessionOpts
+
+    @classmethod
+    def new(
+        cls,
+        *,
+        method: Method = "GET",
+        url: StrOrURL,
+        **opts: Unpack[SessionOpts]
+    ) -> Self:
+        return cls(method, url, opts)
