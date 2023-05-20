@@ -36,9 +36,9 @@ def parse_name(resp: ClientResponse, default: str) -> str:
 
 
 def parse_length(headers: Headers) -> int | None:
+    print(headers)
     if (s := headers.get("Content-Length")) is not None:
         return int(s)
-
 
 async def get_start_byte(headers: Headers, file: Path) -> int:
     if headers.get("Accept-Ranges") == "bytes" and await isfile(file):

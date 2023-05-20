@@ -7,8 +7,8 @@ import aiofiles
 from aiohttp import ClientResponse, ClientSession
 import tqdm
 
-from .. import Client, Handler
-from ..typedefs import Request, SessionOpts, StrOrURL
+from .. import Client, Handler, Request
+from ..typedefs import SessionOpts, StrOrURL
 from .utils import isfile, parse_name, parse_length, get_start_byte
 
 
@@ -24,15 +24,15 @@ class DownloadAlreadyExists(Exception):
         return f"'{self.path}' alredy exists"
 
 
-class Download(NamedTuple):
+class Info(NamedTuple):
     url: StrOrURL
     path: Path
     length: int | None
     start: int
 
     @classmethod
-    async def new(cls, session: ClientSession, url: StrOrURL, /) -> Self:
-        async with session.head(url) as resp:
+    async def find(cls, session: ClientSession, url: StrOrURL, /) -> Self:
+        async with session.head(url, allow_redirects=True) as resp:
             name = parse_name(resp, "untitled")
             length = parse_length(resp.headers)
             path = _DIR.get() / name
@@ -42,30 +42,28 @@ class Download(NamedTuple):
             return cls(url, path, length, start)
 
 
-class Downloader(Handler[Download, None]):
+class DownloadHandler(Handler[Info, None]):
 
     async def create_request(self) -> Request:
-        dl = self.ctx.get()
+        info = self.ctx.get()
         return Request.new(
-            url=dl.url,
-            headers={"Range": f"bytes={dl.start}-"}
+            url=info.url,
+            headers={"Range": f"bytes={info.start}-"}
         )
 
     async def process_response(self, resp: ClientResponse) -> None:
-        dl = self.ctx.get()
-        async with resp, aiofiles.open(dl.path, "wb") as f:
+        info = self.ctx.get()
+        async with resp, aiofiles.open(info.path, "ab") as fp:
             with tqdm.tqdm(
-                total=dl.length,
-                initial=dl.start,
+                total=info.length,
+                initial=info.start,
                 unit="B",
                 unit_scale=True,
                 unit_divisor=1024
-            ) as pbar:
-                if dl.start != 0:
-                    await f.seek(dl.start)
+            ) as bar:
                 async for chunk in resp.content.iter_any():
-                    await f.write(chunk)
-                    pbar.update(len(chunk))
+                    progress = await fp.write(chunk)
+                    bar.update(progress)
 
 
 async def download(
@@ -77,9 +75,7 @@ async def download(
 ) -> None:
     token = _DIR.set(dir)
     async with ClientSession(**kwargs) as session:
-        dls = await asyncio.gather(
-            *(Download.new(session, url) for url in urls)
-        )
-        client = Client(session, Downloader(), max_workers=limit)
-        await client.gather(*dls)
+        info = asyncio.gather(*(Info.find(session, url) for url in urls))
+        client = Client(session, DownloadHandler(), max_workers=limit)
+        await client.gather(*info)
     _DIR.reset(token)
