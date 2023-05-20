@@ -24,7 +24,7 @@ class DownloadAlreadyExists(Exception):
         return f"'{self.path}' alredy exists"
 
 
-class Info(NamedTuple):
+class DownloadInfo(NamedTuple):
     url: StrOrURL
     path: Path
     length: int | None
@@ -42,7 +42,7 @@ class Info(NamedTuple):
             return cls(url, path, length, start)
 
 
-class DownloadHandler(Handler[Info, None]):
+class DownloadHandler(Handler[DownloadInfo, None]):
 
     async def create_request(self) -> Request:
         info = self.ctx.get()
@@ -75,7 +75,9 @@ async def download(
 ) -> None:
     token = _DIR.set(dir)
     async with ClientSession(**kwargs) as session:
-        info = asyncio.gather(*(Info.find(session, url) for url in urls))
+        info = await asyncio.gather(
+            *(DownloadInfo.find(session, url) for url in urls)
+        )
         client = Client(session, DownloadHandler(), max_workers=limit)
         await client.gather(*info)
     _DIR.reset(token)

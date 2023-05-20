@@ -36,7 +36,6 @@ def parse_name(resp: ClientResponse, default: str) -> str:
 
 
 def parse_length(headers: Headers) -> int | None:
-    print(headers)
     if (s := headers.get("Content-Length")) is not None:
         return int(s)
 
