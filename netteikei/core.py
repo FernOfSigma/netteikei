@@ -25,10 +25,10 @@ class Handler(ABC, Generic[_T, _R]):
     Methods
     -------
     create_request()
-        Returns the request URL and options to override the options set
-        in the underlying `aiohttp.ClientSession` instance. This method
-        is called before making each request.
-    process_response(resp)
+        Returns the request method, URL, and options to override the
+        options set in the underlying `aiohttp.ClientSession` instance.
+        This method is called before making each request.
+    process_response(res)
         Processes the `aiohttp.ClientResponse` instance received as its
         only argument into relevant data. This method is called after a
         request has been made.

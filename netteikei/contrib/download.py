@@ -78,6 +78,22 @@ async def download(
     limit: int = 3,
     **kwargs: Unpack[SessionOpts]
 ) -> None:
+    """Asynchronously download files.
+
+    Parameters
+    ----------
+    dir
+        Directory where downloads will be stored.
+    *urls
+        URLs to download from.
+    **kwargs
+        initialization options for the underlying `aiohttp.ClientSession`.
+
+    Raises
+    ------
+    DownloadAlreadyExists
+        Raised when the file has already been downloaded.
+    """
     token = DOWNLOAD_DIR.set(dir)
     async with ClientSession(**kwargs) as session:
         info = await asyncio.gather(
