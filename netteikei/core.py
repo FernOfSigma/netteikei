@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 import asyncio
+from collections.abc import Iterable
 from contextvars import ContextVar
 from typing import Generic, TypeVar, final
 
@@ -80,7 +81,7 @@ class Client(Generic[_T, _R]):
             async with self._session.request(method, url, **opts) as res:
                 return await self._handler.process_response(res)
 
-    async def gather(self, *objs: _T) -> list[_R]:
+    async def process(self, objs: Iterable[_T]) -> list[_R]:
         """Make multiple concurrent HTTP requests.
 
         Processes the given objects into relevant data using the provided
@@ -88,8 +89,8 @@ class Client(Generic[_T, _R]):
 
         Parameters
         ----------
-        obj
-            Data required for making requests.
+        objs
+            Iterable containing data required for making requests.
 
         Returns
         -------

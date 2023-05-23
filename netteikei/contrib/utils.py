@@ -17,18 +17,18 @@ _R = TypeVar("_R")
 
 def wrap(fn: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
     @functools.wraps(fn)
-    async def inner(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
         return await asyncio.to_thread(fn, *args, **kwargs)
-    return inner
+    return wrapper
 
 
 getsize = wrap(os.path.getsize)
 isfile = wrap(os.path.isfile)
 
 
-def parse_name(resp: ClientResponse, default: str) -> str:
-    if (s := resp.headers.get("Content-Disposition")) is None:
-        return resp.url.name
+def parse_name(res: ClientResponse, default: str) -> str:
+    if (s := res.headers.get("Content-Disposition")) is None:
+        return res.url.name
     else:
         if (name := pyrfc6266.parse_filename(s)) is None:
             return default
@@ -38,6 +38,7 @@ def parse_name(resp: ClientResponse, default: str) -> str:
 def parse_length(headers: Headers) -> int | None:
     if (s := headers.get("Content-Length")) is not None:
         return int(s)
+
 
 async def get_start_byte(headers: Headers, file: Path) -> int:
     if headers.get("Accept-Ranges") == "bytes" and await isfile(file):

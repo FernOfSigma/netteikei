@@ -12,7 +12,9 @@ from ..typedefs import SessionOpts, StrOrURL
 from .utils import isfile, parse_name, parse_length, get_start_byte
 
 
-_DIR: ContextVar[Path] = ContextVar("dir")
+__all__ = ["download"]
+
+DOWNLOAD_DIR: ContextVar[Path] = ContextVar("dir")
 
 
 class DownloadAlreadyExists(Exception):
@@ -21,7 +23,7 @@ class DownloadAlreadyExists(Exception):
         self.path = path
 
     def __str__(self) -> str:
-        return f"'{self.path}' alredy exists"
+        return f"Download has already been saved in {self.path}."
 
 
 class DownloadInfo(NamedTuple):
@@ -35,10 +37,13 @@ class DownloadInfo(NamedTuple):
         async with session.head(url, allow_redirects=True) as resp:
             name = parse_name(resp, "untitled")
             length = parse_length(resp.headers)
-            path = _DIR.get() / name
+            path = DOWNLOAD_DIR.get() / name
             start = await get_start_byte(resp.headers, path)
-            if await isfile(path) and start == length:
+
+            # Throw an error if the file already exists and isn't empty.
+            if await isfile(path) and 0 < start == length:
                 raise DownloadAlreadyExists(path)
+
             return cls(url, path, length, start)
 
 
@@ -46,14 +51,14 @@ class DownloadHandler(Handler[DownloadInfo, None]):
 
     async def create_request(self) -> Request:
         info = self.ctx.get()
-        return Request.new(
-            url=info.url,
-            headers={"Range": f"bytes={info.start}-"}
-        )
+        # Don't send extra headers when starting a download from the beginning
+        # of a file.
+        headers = {} if info.start == 0 else {"Range": f"bytes={info.start}-"} 
+        return Request.new(url=info.url, headers=headers)
 
-    async def process_response(self, resp: ClientResponse) -> None:
+    async def process_response(self, res: ClientResponse) -> None:
         info = self.ctx.get()
-        async with resp, aiofiles.open(info.path, "ab") as fp:
+        async with res, aiofiles.open(info.path, "ab") as fp:
             with tqdm.tqdm(
                 total=info.length,
                 initial=info.start,
@@ -61,7 +66,7 @@ class DownloadHandler(Handler[DownloadInfo, None]):
                 unit_scale=True,
                 unit_divisor=1024
             ) as bar:
-                async for chunk in resp.content.iter_any():
+                async for chunk in res.content.iter_any():
                     progress = await fp.write(chunk)
                     bar.update(progress)
 
@@ -73,11 +78,11 @@ async def download(
     limit: int = 3,
     **kwargs: Unpack[SessionOpts]
 ) -> None:
-    token = _DIR.set(dir)
+    token = DOWNLOAD_DIR.set(dir)
     async with ClientSession(**kwargs) as session:
         info = await asyncio.gather(
             *(DownloadInfo.find(session, url) for url in urls)
         )
         client = Client(session, DownloadHandler(), max_workers=limit)
-        await client.gather(*info)
-    _DIR.reset(token)
+        await client.process(info)
+    DOWNLOAD_DIR.reset(token)
