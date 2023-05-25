@@ -37,10 +37,15 @@ class SessionOpts(TypedDict, total=False):
     trace_configs: list[TraceConfig] | None
 
 
+class Opts(SessionOpts, total=False):
+    allow_redirects: bool
+    data: Any
+
+
 class Request(NamedTuple):
     method: Method
     url: StrOrURL
-    opts: SessionOpts
+    opts: Opts
 
     @classmethod
     def new(
@@ -48,6 +53,6 @@ class Request(NamedTuple):
         *,
         method: Method = "GET",
         url: StrOrURL,
-        **opts: Unpack[SessionOpts]
+        **opts: Unpack[Opts]
     ) -> Self:
         return cls(method, url, opts)

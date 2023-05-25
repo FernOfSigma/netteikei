@@ -76,7 +76,7 @@ async def download(
     /,
     *urls: StrOrURL,
     limit: int = 3,
-    **kwargs: Unpack[SessionOpts]
+    **opts: Unpack[SessionOpts]
 ) -> None:
     """Asynchronously download files.
 
@@ -86,8 +86,8 @@ async def download(
         Directory where downloads will be stored.
     *urls
         URLs to download from.
-    **kwargs
-        initialization options for the underlying `aiohttp.ClientSession`.
+    **opts
+        Initialization options for the underlying `aiohttp.ClientSession`.
 
     Raises
     ------
@@ -95,7 +95,7 @@ async def download(
         Raised when the file has already been downloaded.
     """
     token = DOWNLOAD_DIR.set(dir)
-    async with ClientSession(**kwargs) as session:
+    async with ClientSession(**opts) as session:
         info = await asyncio.gather(
             *(DownloadInfo.find(session, url) for url in urls)
         )
