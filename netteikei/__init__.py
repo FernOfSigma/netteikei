@@ -1,6 +1,6 @@
-from .core import Client, Handler
+from .core import Client
 from .typedefs import Request
 
 
-__version__ = "0.3.1"
-__all__ = ["Client", "Handler", "Request"]
+__version__ = "0.4.0"
+__all__ = ["Client", "Request"]

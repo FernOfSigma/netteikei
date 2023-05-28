@@ -1,9 +1,18 @@
-from collections.abc import Callable, Iterable, Mapping
-from typing import Any, Literal, NamedTuple, Self, TypedDict, Unpack
+from collections.abc import Awaitable, Callable, Iterable, Mapping
+from typing import (
+    Any,
+    Literal,
+    NamedTuple,
+    Self,
+    TypeVar,
+    TypedDict,
+    Unpack
+)
 
 from aiohttp import (
     BaseConnector,
     BasicAuth,
+    ClientResponse,
     ClientTimeout,
     HttpVersion,
     TraceConfig
@@ -13,7 +22,7 @@ from aiohttp.typedefs import StrOrURL
 from multidict import istr
 
 
-Method = Literal["POST", "GET", "PUT", "HEAD", "PATCH", "DELETE"]
+Method = Literal["POST", "GET", "PUT", "HEAD", "PATCH", "OPTIONS", "DELETE"]
 Headers = Mapping[str, str]
 
 
@@ -56,3 +65,9 @@ class Request(NamedTuple):
         **opts: Unpack[Opts]
     ) -> Self:
         return cls(method, url, opts)
+
+
+T, U = TypeVar("T"), TypeVar("U")
+
+ReqHandler = Callable[[T], Awaitable[Request]]
+ResHandler = Callable[[T, ClientResponse], Awaitable[U]]

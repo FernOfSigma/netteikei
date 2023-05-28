@@ -1,100 +1,102 @@
-from abc import ABC, abstractmethod
 import asyncio
 from collections.abc import Iterable
-from contextvars import ContextVar
-from typing import Generic, TypeVar, final
+from typing import Generic, final, overload
 
-from aiohttp import ClientResponse, ClientSession
+from aiohttp import ClientSession
 
-from .typedefs import Request
-
-
-_T = TypeVar("_T")
-_R = TypeVar("_R")
-
-
-class Handler(ABC, Generic[_T, _R]):
-    """Base class designed for making requests.
-
-    Attributes
-    ----------
-    ctx
-        Context variable possessing relevant data for making requests.
-        The value is automatically set for each request.
-
-    Methods
-    -------
-    create_request()
-        Returns the request method, URL, and options to override the
-        options set in the underlying `aiohttp.ClientSession` instance.
-        This method is called before making each request.
-    process_response(res)
-        Processes the `aiohttp.ClientResponse` instance received as its
-        only argument into relevant data. This method is called after a
-        request has been made.
-    """
-
-    ctx: ContextVar[_T] = ContextVar("ctx")
-
-    @abstractmethod
-    async def create_request(self) -> Request:
-        ...
-
-    @abstractmethod
-    async def process_response(self, res: ClientResponse) -> _R:
-        ...
+from .typedefs import ReqHandler, ResHandler, T, U
 
 
 @final
-class Client(Generic[_T, _R]):
-    """
-    Utility for making concurrent HTTP requests.
+class Client(Generic[T, U]):
+    """Utility for making concurrent HTTP requests.
 
     Parameters
     ----------
     session
         An instance of `aiohttp.ClientSession`.
-    handler
-        Instance of a `Handler` implementation.
+    handlers
+        Tuple containing the request and response handler pair.
+
+        The request handler returns the request method, URL, and options
+        that override the options set within the `aiohttp.ClientSession`
+        used underneath.
+
+        The response handler receieves a `aiohttp.ClientResponse` as its
+        second argument which is processed into relevant data.
+
+        Both handlers are asynchronous, and are called before and after
+        each request made respectively.
     max_workers, default 5
         Number of request workers that can run concurrently.
 
-    See Also
-    --------
-    Handler : Abstract base class for making requests.
+    Methods
+    -------
+    run(session, objs, return_exceptions=False)
     """
-
     def __init__(
         self,
-        session: ClientSession,
-        handler: Handler[_T, _R],
+        *,
+        handlers: tuple[ReqHandler[T], ResHandler[T, U]],
         max_workers: int = 5
     ) -> None:
-        self._session = session
-        self._handler = handler
-        self._sem = asyncio.Semaphore(max_workers)
+        self._semaphore = asyncio.Semaphore(max_workers)
+        self._req_handler, self._res_handler = handlers
     
-    async def _request(self, obj: _T) -> _R:
-        async with self._sem:
-            self._handler.ctx.set(obj)
-            method, url, opts = await self._handler.create_request()
-            async with self._session.request(method, url, **opts) as res:
-                return await self._handler.process_response(res)
+    async def _request(self, session: ClientSession, obj: T) -> U:
+        async with self._semaphore:
+            method, url, opts = await self._req_handler(obj)
+            async with session.request(method, url, **opts) as res:
+                return await self._res_handler(obj, res)
 
-    async def process(self, objs: Iterable[_T]) -> list[_R]:
-        """Make multiple concurrent HTTP requests.
+    @overload
+    async def run(
+        self,
+        session: ClientSession,
+        objs: Iterable[T],
+        /,
+        return_exceptions: bool = False
+    ) -> list[U]:
+        ...
 
-        Processes the given objects into relevant data using the provided
-        `Handler` implementation.
+    @overload
+    async def run(
+        self,
+        session: ClientSession,
+        objs: Iterable[T],
+        /,
+        return_exceptions: bool = True
+    ) -> list[U | BaseException]:
+        ...
+
+    async def run(
+        self,
+        session: ClientSession,
+        objs: Iterable[T],
+        /,
+        return_exceptions: bool = False
+    ) -> list[U] | list[U | BaseException]:
+        """Make concurrent HTTP requests.
+
+        Processes the given objects into relevant data using the user
+        provided handlers.
 
         Parameters
         ----------
+        session
+            An instance of `aiohttp.ClientSession`.
         objs
             Iterable containing data required for making requests.
+        return_exceptions, default False
+            When this is `True`, exceptions are treated as successful
+            results and are returned along with the processed data.
 
         Returns
         -------
         list
             Results processed from the given data.
         """
-        return await asyncio.gather(*(self._request(obj) for obj in objs))
+        return await asyncio.gather(
+            *(self._request(session, obj) for obj in objs),
+            return_exceptions=return_exceptions
+        )
