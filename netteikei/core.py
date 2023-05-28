@@ -45,8 +45,8 @@ class Client(Generic[T, U]):
     
     async def _request(self, session: ClientSession, obj: T) -> U:
         async with self._semaphore:
-            method, url, opts = await self._req_handler(obj)
-            async with session.request(method, url, **opts) as res:
+            method, url, kwargs = await self._req_handler(obj)
+            async with session.request(method, url, **kwargs) as res:
                 return await self._res_handler(obj, res)
 
     @overload

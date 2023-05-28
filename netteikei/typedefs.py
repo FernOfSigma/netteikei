@@ -1,4 +1,5 @@
 from collections.abc import Awaitable, Callable, Iterable, Mapping
+from types import SimpleNamespace
 from typing import (
     Any,
     Literal,
@@ -14,29 +15,35 @@ from aiohttp import (
     BasicAuth,
     ClientResponse,
     ClientTimeout,
+    Fingerprint,
     HttpVersion,
     TraceConfig
 )
+from aiohttp.connector import SSLContext
 from aiohttp.abc import AbstractCookieJar
-from aiohttp.typedefs import StrOrURL
-from multidict import istr
+from aiohttp.typedefs import (
+    JSONEncoder, 
+    StrOrURL,
+    LooseHeaders,
+    LooseCookies
+)
 
 
 Method = Literal["POST", "GET", "PUT", "HEAD", "PATCH", "OPTIONS", "DELETE"]
-Headers = Mapping[str, str]
 
 
 # Wide type hints according to the aiohttp 3.8.4 documentation.
-class SessionOpts(TypedDict, total=False):
+class SessionKwargs(TypedDict, total=False):
     base_url: StrOrURL
     connector: BaseConnector
-    cookies: dict[str, str]
-    headers: Headers
-    skip_auto_headers: Iterable[str | istr]
+    cookies: LooseCookies
+    headers: LooseHeaders
+    skip_auto_headers: Iterable[str]
     auth: BasicAuth
+    json_serialize: JSONEncoder
     version: HttpVersion
     cookie_jar: AbstractCookieJar
-    json_serialize: Callable[[Any], str]
+    connector_owner: bool
     raise_for_status: bool
     timeout: ClientTimeout
     auto_decompress: bool
@@ -46,15 +53,34 @@ class SessionOpts(TypedDict, total=False):
     trace_configs: list[TraceConfig] | None
 
 
-class Opts(SessionOpts, total=False):
-    allow_redirects: bool
+class RequestKwargs(TypedDict, total=False):
+    params: Mapping[str, str]
     data: Any
+    json: Any
+    headers: LooseHeaders
+    skip_auto_headers: Iterable[str]
+    auth: BasicAuth
+    allow_redirects: bool
+    max_redirects: int
+    compress: bool
+    # Docs are ambiguious for this keyword.
+    # chunked: bool
+    expect100: bool
+    raise_for_status: bool
+    read_until_eof: bool
+    read_bufsize: int
+    proxy: StrOrURL
+    proxy_auth: BasicAuth
+    timeout: ClientTimeout
+    ssl: SSLContext | bool | Fingerprint
+    proxy_headers: LooseHeaders
+    trace_request_ctx: SimpleNamespace
 
 
 class Request(NamedTuple):
     method: Method
     url: StrOrURL
-    opts: Opts
+    kwargs: RequestKwargs
 
     @classmethod
     def new(
@@ -62,9 +88,9 @@ class Request(NamedTuple):
         *,
         method: Method = "GET",
         url: StrOrURL,
-        **opts: Unpack[Opts]
+        **kwargs: Unpack[RequestKwargs]
     ) -> Self:
-        return cls(method, url, opts)
+        return cls(method, url, kwargs)
 
 
 T, U = TypeVar("T"), TypeVar("U")

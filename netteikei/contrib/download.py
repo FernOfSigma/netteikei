@@ -8,7 +8,7 @@ from aiohttp import ClientResponse, ClientSession
 import tqdm
 
 from .. import Client, Request
-from ..typedefs import SessionOpts, StrOrURL
+from ..typedefs import SessionKwargs, StrOrURL
 from .utils import isfile, parse_name, parse_length, get_start_byte
 
 
@@ -72,7 +72,7 @@ async def download(
     /,
     *urls: StrOrURL,
     limit: int = 3,
-    **opts: Unpack[SessionOpts]
+    **kwargs: Unpack[SessionKwargs]
 ) -> None:
     """Asynchronously download files.
 
@@ -91,7 +91,7 @@ async def download(
         Raised when the file has already been downloaded.
     """
     token = download_dir.set(dir)
-    async with ClientSession(**opts) as session:
+    async with ClientSession(**kwargs) as session:
         info = await asyncio.gather(
             *(DownloadInfo.find(session, url) for url in urls)
         )

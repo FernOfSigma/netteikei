@@ -6,9 +6,8 @@ from pathlib import Path
 from typing import ParamSpec, TypeVar
 
 from aiohttp import ClientResponse
+from aiohttp.typedefs import LooseHeaders
 import pyrfc6266
-
-from ..typedefs import Headers
 
 
 _P = ParamSpec("_P")
@@ -35,12 +34,12 @@ def parse_name(res: ClientResponse, default: str) -> str:
         return name
 
 
-def parse_length(headers: Headers) -> int | None:
+def parse_length(headers: LooseHeaders) -> int | None:
     if (s := headers.get("Content-Length")) is not None:
         return int(s)
 
 
-async def get_start_byte(headers: Headers, file: Path) -> int:
+async def get_start_byte(headers: LooseHeaders, file: Path) -> int:
     if headers.get("Accept-Ranges") == "bytes" and await isfile(file):
         return await getsize(file)
     return 0
