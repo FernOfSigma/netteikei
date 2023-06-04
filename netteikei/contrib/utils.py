@@ -2,44 +2,20 @@ import asyncio
 from collections.abc import Awaitable, Callable
 import functools
 import os
-from pathlib import Path
 from typing import ParamSpec, TypeVar
 
-from aiohttp import ClientResponse
-from aiohttp.typedefs import LooseHeaders
-import pyrfc6266
+
+P = ParamSpec("P")
+T = TypeVar("T")
 
 
-_P = ParamSpec("_P")
-_R = TypeVar("_R")
-
-
-def wrap(fn: Callable[_P, _R]) -> Callable[_P, Awaitable[_R]]:
+def wrap(fn: Callable[P, T]) -> Callable[P, Awaitable[T]]:
     @functools.wraps(fn)
-    async def wrapper(*args: _P.args, **kwargs: _P.kwargs) -> _R:
+    async def wrapper(*args: P.args, **kwargs: P.kwargs) -> T:
         return await asyncio.to_thread(fn, *args, **kwargs)
     return wrapper
 
 
 getsize = wrap(os.path.getsize)
 isfile = wrap(os.path.isfile)
-
-
-def parse_name(res: ClientResponse, default: str) -> str:
-    if (s := res.headers.get("Content-Disposition")) is None:
-        return res.url.name
-    else:
-        if (name := pyrfc6266.parse_filename(s)) is None:
-            return default
-        return name
-
-
-def parse_length(headers: LooseHeaders) -> int | None:
-    if (s := headers.get("Content-Length")) is not None:
-        return int(s)
-
-
-async def get_start_byte(headers: LooseHeaders, file: Path) -> int:
-    if headers.get("Accept-Ranges") == "bytes" and await isfile(file):
-        return await getsize(file)
-    return 0
+makedirs = wrap(os.makedirs)

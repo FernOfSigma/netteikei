@@ -1,10 +1,10 @@
 import asyncio
 from collections.abc import Iterable
-from typing import Generic, final, overload
+from typing import Generic, Literal, final, overload
 
 from aiohttp import ClientSession
 
-from .typedefs import ReqHandler, ResHandler, T, U
+from .typedefs import RequestHandler, ResponseHandler, T, U
 
 
 @final
@@ -27,8 +27,8 @@ class Client(Generic[T, U]):
 
         Both handlers are asynchronous, and are called before and after
         each request made respectively.
-    max_workers, default 5
-        Number of request workers that can run concurrently.
+    limit, default 10
+        Number of requests that can run concurrently.
 
     Methods
     -------
@@ -37,10 +37,10 @@ class Client(Generic[T, U]):
     def __init__(
         self,
         *,
-        handlers: tuple[ReqHandler[T], ResHandler[T, U]],
-        max_workers: int = 5
+        handlers: tuple[RequestHandler[T], ResponseHandler[T, U]],
+        limit: int = 10
     ) -> None:
-        self._semaphore = asyncio.Semaphore(max_workers)
+        self._semaphore = asyncio.Semaphore(limit)
         self._req_handler, self._res_handler = handlers
     
     async def _request(self, session: ClientSession, obj: T) -> U:
@@ -55,7 +55,7 @@ class Client(Generic[T, U]):
         session: ClientSession,
         objs: Iterable[T],
         /,
-        return_exceptions: bool = False
+        return_exceptions: Literal[False] = False
     ) -> list[U]:
         ...
 
@@ -65,7 +65,7 @@ class Client(Generic[T, U]):
         session: ClientSession,
         objs: Iterable[T],
         /,
-        return_exceptions: bool = True
+        return_exceptions: Literal[True]
     ) -> list[U | BaseException]:
         ...
 
@@ -74,7 +74,7 @@ class Client(Generic[T, U]):
         session: ClientSession,
         objs: Iterable[T],
         /,
-        return_exceptions: bool = False
+        return_exceptions: Literal[True, False] = False
     ) -> list[U] | list[U | BaseException]:
         """Make concurrent HTTP requests.
 

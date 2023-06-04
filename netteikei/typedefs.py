@@ -58,6 +58,7 @@ class RequestKwargs(TypedDict, total=False):
     data: Any
     json: Any
     headers: LooseHeaders
+    cookies: LooseCookies
     skip_auto_headers: Iterable[str]
     auth: BasicAuth
     allow_redirects: bool
@@ -95,5 +96,5 @@ class Request(NamedTuple):
 
 T, U = TypeVar("T"), TypeVar("U")
 
-ReqHandler = Callable[[T], Awaitable[Request]]
-ResHandler = Callable[[T, ClientResponse], Awaitable[U]]
+RequestHandler = Callable[[T], Awaitable[Request]]
+ResponseHandler = Callable[[T, ClientResponse], Awaitable[U]]
